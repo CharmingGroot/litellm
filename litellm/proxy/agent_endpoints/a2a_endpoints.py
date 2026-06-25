@@ -390,9 +390,26 @@ async def _handle_stream_message(
         and proxy_logging_obj is not None
     )
 
+    try:
+        message_send_params = _build_message_send_params(params)
+    except (ValidationError, ValueError) as e:
+        invalid_params_message = f"Invalid params: {e}"
+
+        async def _invalid_params_stream():
+            yield json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {"code": -32602, "message": invalid_params_message},
+                }
+            ) + "\n"
+
+        return StreamingResponse(
+            _invalid_params_stream(), media_type="application/x-ndjson"
+        )
+
     async def stream_response():
         try:
-            message_send_params = _build_message_send_params(params)
             a2a_request = SendStreamingMessageRequest(
                 id=request_id,
                 params=message_send_params,
