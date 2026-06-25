@@ -13,12 +13,29 @@ from typing import Protocol
 from pydantic import BaseModel
 
 import e2e_http
-from e2e_http import URL, AuthHeaders, ProbeResult, Result, StreamingResponse
+from e2e_http import (
+    URL,
+    AuthHeaders,
+    MultipartFile,
+    ProbeResult,
+    Result,
+    StreamingResponse,
+)
 
 
 class Transport(Protocol):
     def post[R: BaseModel](
         self, path: str, *, headers: BaseModel, json: BaseModel, response_type: type[R]
+    ) -> Result[R]: ...
+
+    def upload[R: BaseModel](
+        self,
+        path: str,
+        *,
+        headers: BaseModel,
+        form: BaseModel,
+        file: MultipartFile,
+        response_type: type[R],
     ) -> Result[R]: ...
 
     def stream(
@@ -50,6 +67,10 @@ class Transport(Protocol):
 
     def probe(self, path: str, *, params: BaseModel) -> ProbeResult: ...
 
+    def download(
+        self, path: str, *, headers: BaseModel, params: BaseModel
+    ) -> ProbeResult: ...
+
     def bearer(self, key: str) -> AuthHeaders: ...
 
     @property
@@ -79,6 +100,24 @@ class HttpTransport:
             self._url(path),
             headers=headers,
             json=json,
+            response_type=response_type,
+            timeout=self.request_timeout,
+        )
+
+    def upload[R: BaseModel](
+        self,
+        path: str,
+        *,
+        headers: BaseModel,
+        form: BaseModel,
+        file: MultipartFile,
+        response_type: type[R],
+    ) -> Result[R]:
+        return e2e_http.upload(
+            self._url(path),
+            headers=headers,
+            form=form,
+            file=file,
             response_type=response_type,
             timeout=self.request_timeout,
         )
@@ -143,6 +182,16 @@ class HttpTransport:
             timeout=self.request_timeout,
         )
 
+    def download(
+        self, path: str, *, headers: BaseModel, params: BaseModel
+    ) -> ProbeResult:
+        return e2e_http.probe(
+            self._url(path),
+            headers=headers,
+            params=params,
+            timeout=self.request_timeout,
+        )
+
 
 # Top-level management/admin route groups. In a split deployment these are served
 # by the control plane (a different service from the LLM data plane). LLM routes
@@ -203,6 +252,19 @@ class SplitTransport:
             path, headers=headers, json=json, response_type=response_type
         )
 
+    def upload[R: BaseModel](
+        self,
+        path: str,
+        *,
+        headers: BaseModel,
+        form: BaseModel,
+        file: MultipartFile,
+        response_type: type[R],
+    ) -> Result[R]:
+        return self._route(path).upload(
+            path, headers=headers, form=form, file=file, response_type=response_type
+        )
+
     def get[R: BaseModel](
         self,
         path: str,
@@ -242,3 +304,8 @@ class SplitTransport:
 
     def probe(self, path: str, *, params: BaseModel) -> ProbeResult:
         return self._route(path).probe(path, params=params)
+
+    def download(
+        self, path: str, *, headers: BaseModel, params: BaseModel
+    ) -> ProbeResult:
+        return self._route(path).download(path, headers=headers, params=params)

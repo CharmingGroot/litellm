@@ -1,0 +1,115 @@
+# Local e2e proxy, built from the litellm_internal_staging branch.
+#
+# The image `litellm-staging:local` is built from a clean checkout of
+# litellm_internal_staging (the working tree's uv.lock has merge markers, so
+# build from a worktree, not the dirty tree):
+#
+#   git worktree add /tmp/litellm-staging litellm_internal_staging
+#   docker build -t litellm-staging:local /tmp/litellm-staging
+#
+# Then provide provider keys (copy .env.example -> .env, fill in keys) and run:
+#
+#   docker compose -f tests/e2e/docker-compose.yml up -d
+#
+# The proxy comes up on http://localhost:4000 with master key sk-1234, which is
+# what the e2e suites default to. Point the suites at it:
+#
+#   LITELLM_MASTER_KEY=sk-1234 LITELLM_PROXY_URL=http://localhost:4000 \
+#     .venv/bin/python -m pytest tests/e2e/ -v
+
+services:
+  litellm:
+    image: litellm-staging:local
+    ports:
+      - "4000:4000"
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes:
+      - ./gateway/litellm-config.yml:/app/config.yaml
+    environment:
+      DATABASE_URL: "postgresql://llmproxy:dbpassword9090@db:5432/litellm"
+      LITELLM_MASTER_KEY: "sk-1234"
+      STORE_MODEL_IN_DB: "True"
+      # Run the budget-reset job every ~15-20s (default ~10min) so short budget
+      # windows actually reset within an e2e test (multi-window + reset suites).
+      PROXY_BUDGET_RESCHEDULER_MIN_TIME: "15"
+      PROXY_BUDGET_RESCHEDULER_MAX_TIME: "20"
+      # LITELLM_LICENSE is injected from .env (gitignored), never hardcoded here.
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: llmproxy
+      POSTGRES_PASSWORD: dbpassword9090
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    # Exposed on host 6380 (not 6379, to avoid clashing with a host-local redis) so
+    # test_spend_counter_reseed_e2e can read the shared spend counter back and assert
+    # it equals the DB spend. The litellm container still reaches it as redis:6379.
+    ports:
+      - "6380:6379"
+
+  perkeep:
+    # Content-addressable blob store used as a plain upstream for the batch
+    # file-upload tests (perkeep-batch deployment points its api_base here). Pinned
+    # by digest; amd64-only image, runs under emulation on arm64. perkeepd
+    # auto-generates its config with `auth: localhost` on first boot, so generate it,
+    # switch auth to userpass, then serve on 0.0.0.0.
+    image: perkeep/perkeep@sha256:7b9de42049d7eeff4011e159fb30db7c0806cd406f45090e4f2ce5a419180e85
+    platform: linux/amd64
+    ports:
+      - "3179:3179"
+    volumes:
+      - perkeep_config:/home/keepy/.config/perkeep
+      - perkeep_blobs:/home/keepy/var/perkeep
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        CFG=/home/keepy/.config/perkeep/server-config.json
+        if [ ! -f "$$CFG" ]; then
+          /home/keepy/bin/perkeepd -openbrowser=false -listen=127.0.0.1:3179 &
+          PID=$$!
+          while [ ! -f "$$CFG" ]; do sleep 1; done
+          sleep 3
+          kill "$$PID" 2>/dev/null || true
+          sleep 2
+          sed -i 's/"auth": "localhost"/"auth": "userpass:perkeep:perkeep"/' "$$CFG"
+        fi
+        exec /home/keepy/bin/perkeepd -openbrowser=false -listen=0.0.0.0:3179
+
+  perkeep-openai:
+    # Makes perkeep speak OpenAI /v1/files: translates each upload into a perkeep
+    # blob via pk-put. The perkeep-batch deployment's api_base points here. Mounts
+    # perkeep's config (read-only) so pk-put signs claims with the server's own
+    # identity - otherwise the permanodes it creates aren't indexed and don't show
+    # in the perkeep UI.
+    build:
+      context: ./perkeep_openai
+    platform: linux/amd64
+    environment:
+      PERKEEP_SERVER: "http://perkeep:3179"
+      CAMLI_AUTH: "userpass:perkeep:perkeep"
+    volumes:
+      - perkeep_config:/perkeep-config:ro
+    depends_on:
+      - perkeep
+
+volumes:
+  postgres_data:
+    driver: local
+  perkeep_config:
+    driver: local
+  perkeep_blobs:
+    driver: local
