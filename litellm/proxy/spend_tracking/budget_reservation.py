@@ -17,6 +17,7 @@ from litellm.proxy._types import (
     UserAPIKeyAuth,
 )
 from litellm.proxy.auth.auth_utils import get_model_from_request
+from litellm.proxy.auth.budget_throttle import should_throttle_budget_exceeded
 from litellm.proxy.auth.route_checks import RouteChecks
 from litellm.proxy.utils import PrismaClient, ProxyLogging
 from litellm.router import Router
@@ -132,6 +133,21 @@ async def reserve_budget_for_request(
                     cached_spend = await _get_current_counter_value(counter=counter)
                 current_spend = cached_spend + reservation_cost
             if current_spend > counter.max_budget:
+                # An over-budget key that opted into throttling is slowed by the
+                # rate limiter, not blocked here, so release its own max_budget
+                # reservation instead of raising. Under-budget requests never
+                # reach this branch, so their concurrent-overspend protection is
+                # untouched; team/user/window counters still enforce normally.
+                if (
+                    counter.counter_key == f"spend:key:{valid_token.token}"
+                    and should_throttle_budget_exceeded(valid_token)
+                ):
+                    await _release_applied_entries_best_effort(
+                        entries=[entry],
+                        default_reserved_cost=reservation_cost,
+                    )
+                    applied_entries.remove(entry)
+                    continue
                 remaining_before_reservation = counter.max_budget - (
                     current_spend - reservation_cost
                 )
