@@ -85,7 +85,7 @@ const menuGroups: MenuGroup[] = [
       {
         key: "api-keys",
         page: "api-keys",
-        label: "Virtual Keys",
+        label: "Virtual Keys 🔧",
         icon: <KeyOutlined />,
       },
       {

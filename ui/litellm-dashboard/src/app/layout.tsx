@@ -9,7 +9,7 @@ import ReactQueryProvider from "@/contexts/ReactQueryProvider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "LiteLLM Dashboard",
+  title: "LiteLLM REBUILT ✅",
   description: "LiteLLM Proxy Admin UI",
   icons: { icon: "/get_favicon" },
 };

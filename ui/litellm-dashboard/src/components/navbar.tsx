@@ -94,7 +94,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       style={{ animationDuration: "2s" }}
                       title="Thanks for using LiteLLM!"
                     >
-                      🌑
+                      💩
                     </span>
                   )}
                   <Tag className="relative z-10 cursor-pointer text-xs font-medium">
