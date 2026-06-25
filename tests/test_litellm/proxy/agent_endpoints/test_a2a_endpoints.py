@@ -1908,12 +1908,12 @@ async def test_caller_identity_headers_cannot_be_spoofed_via_forwarded_headers()
         )
 
     posted_headers = mock_handler.post.call_args.kwargs.get("headers") or {}
-    assert (
-        posted_headers.get("X-LiteLLM-User-Id") == "real-user"
-    ), "authenticated user id must not be overridden by forwarded client headers"
-    assert (
-        posted_headers.get("X-LiteLLM-Team-Id") == "real-team"
-    ), "authenticated team id must not be overridden by forwarded client headers"
+    assert posted_headers.get("X-LiteLLM-User-Id") == "real-user", (
+        "authenticated user id must not be overridden by forwarded client headers"
+    )
+    assert posted_headers.get("X-LiteLLM-Team-Id") == "real-team", (
+        "authenticated team id must not be overridden by forwarded client headers"
+    )
 
 
 def _agent(protocol_version):

@@ -373,32 +373,48 @@ def _lower_request_params(params: JsonDict, *, method: str) -> JsonDict:
     )
 
     lowerings: dict[str, Callable[[JsonDict], BaseModel]] = {
-        "tasks/get": lambda p: to_compat_get_task_request(
-            _parse(ParseDict, p, pb2_v10.GetTaskRequest()), ""
-        ).params,
-        "tasks/cancel": lambda p: to_compat_cancel_task_request(
-            _parse(ParseDict, p, pb2_v10.CancelTaskRequest()), ""
-        ).params,
-        "tasks/resubscribe": lambda p: to_compat_subscribe_to_task_request(
-            _parse(ParseDict, p, pb2_v10.SubscribeToTaskRequest()), ""
-        ).params,
-        "tasks/pushNotificationConfig/set": lambda p: to_compat_create_task_push_notification_config_request(
-            _parse(
-                ParseDict,
-                _flatten_create_push_notification_params(p),
-                pb2_v10.TaskPushNotificationConfig(),
-            ),
-            "",
-        ).params,
-        "tasks/pushNotificationConfig/get": lambda p: to_compat_get_task_push_notification_config_request(
-            _parse(ParseDict, p, pb2_v10.GetTaskPushNotificationConfigRequest()), ""
-        ).params,
-        "tasks/pushNotificationConfig/list": lambda p: to_compat_list_task_push_notification_config_request(
-            _parse(ParseDict, p, pb2_v10.ListTaskPushNotificationConfigsRequest()), ""
-        ).params,
-        "tasks/pushNotificationConfig/delete": lambda p: to_compat_delete_task_push_notification_config_request(
-            _parse(ParseDict, p, pb2_v10.DeleteTaskPushNotificationConfigRequest()), ""
-        ).params,
+        "tasks/get": lambda p: (
+            to_compat_get_task_request(
+                _parse(ParseDict, p, pb2_v10.GetTaskRequest()), ""
+            ).params
+        ),
+        "tasks/cancel": lambda p: (
+            to_compat_cancel_task_request(
+                _parse(ParseDict, p, pb2_v10.CancelTaskRequest()), ""
+            ).params
+        ),
+        "tasks/resubscribe": lambda p: (
+            to_compat_subscribe_to_task_request(
+                _parse(ParseDict, p, pb2_v10.SubscribeToTaskRequest()), ""
+            ).params
+        ),
+        "tasks/pushNotificationConfig/set": lambda p: (
+            to_compat_create_task_push_notification_config_request(
+                _parse(
+                    ParseDict,
+                    _flatten_create_push_notification_params(p),
+                    pb2_v10.TaskPushNotificationConfig(),
+                ),
+                "",
+            ).params
+        ),
+        "tasks/pushNotificationConfig/get": lambda p: (
+            to_compat_get_task_push_notification_config_request(
+                _parse(ParseDict, p, pb2_v10.GetTaskPushNotificationConfigRequest()), ""
+            ).params
+        ),
+        "tasks/pushNotificationConfig/list": lambda p: (
+            to_compat_list_task_push_notification_config_request(
+                _parse(ParseDict, p, pb2_v10.ListTaskPushNotificationConfigsRequest()),
+                "",
+            ).params
+        ),
+        "tasks/pushNotificationConfig/delete": lambda p: (
+            to_compat_delete_task_push_notification_config_request(
+                _parse(ParseDict, p, pb2_v10.DeleteTaskPushNotificationConfigRequest()),
+                "",
+            ).params
+        ),
     }
     lower = lowerings.get(method)
     if lower is None:

@@ -369,16 +369,19 @@ async def _handle_stream_message(
     if not A2A_SDK_AVAILABLE:
 
         async def _error_stream():
-            yield json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {
-                        "code": -32603,
-                        "message": "Server error: 'a2a' package not installed",
-                    },
-                }
-            ) + "\n"
+            yield (
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32603,
+                            "message": "Server error: 'a2a' package not installed",
+                        },
+                    }
+                )
+                + "\n"
+            )
 
         return StreamingResponse(_error_stream(), media_type="application/x-ndjson")
 
@@ -396,13 +399,16 @@ async def _handle_stream_message(
         invalid_params_message = f"Invalid params: {e}"
 
         async def _invalid_params_stream():
-            yield json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {"code": -32602, "message": invalid_params_message},
-                }
-            ) + "\n"
+            yield (
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {"code": -32602, "message": invalid_params_message},
+                    }
+                )
+                + "\n"
+            )
 
         return StreamingResponse(
             _invalid_params_stream(), media_type="application/x-ndjson"
@@ -503,13 +509,19 @@ async def _handle_stream_message(
                     e = transformed_exception
             if isinstance(e, HTTPException):
                 raise
-            yield json.dumps(
-                {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {"code": -32603, "message": f"Streaming error: {str(e)}"},
-                }
-            ) + "\n"
+            yield (
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32603,
+                            "message": f"Streaming error: {str(e)}",
+                        },
+                    }
+                )
+                + "\n"
+            )
 
     return StreamingResponse(stream_response(), media_type="application/x-ndjson")
 
@@ -854,7 +866,9 @@ async def invoke_agent_a2a(
             response_dict: Dict[str, Any] = (
                 response.model_dump(mode="json", exclude_none=True)  # type: ignore
                 if hasattr(response, "model_dump")
-                else response if isinstance(response, dict) else {}
+                else response
+                if isinstance(response, dict)
+                else {}
             )
             return JSONResponse(
                 content=normalize_jsonrpc_response(
